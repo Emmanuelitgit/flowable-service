@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:flowable="http://flowable.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" typeLanguage="http://www.w3.org/2001/XMLSchema" expressionLanguage="http://www.w3.org/1999/XPath" targetNamespace="http://www.flowable.org/processdef" exporter="Flowable Open Source Modeler" exporterVersion="6.8.0">
+  <process id="leaveProcess" name="Leave Approval" isExecutable="true" flowable:candidateStarterUsers="employee">
+    <startEvent id="startEvent1" flowable:formFieldValidation="true"></startEvent>
+    <userTask id="submitLeaveRequest" name="Submit Leave Request" flowable:assignee="employee" flowable:formKey="leaveRequest" flowable:formFieldValidation="true">
+      <extensionElements>
+        <modeler:activiti-idm-assignee xmlns:modeler="http://flowable.org/modeler"><![CDATA[true]]></modeler:activiti-idm-assignee>
+        <modeler:assignee-info-email xmlns:modeler="http://flowable.org/modeler"><![CDATA[eyidana002@gmail.com]]></modeler:assignee-info-email>
+        <modeler:assignee-info-firstname xmlns:modeler="http://flowable.org/modeler"><![CDATA[Emmanuel]]></modeler:assignee-info-firstname>
+        <modeler:assignee-info-lastname xmlns:modeler="http://flowable.org/modeler"><![CDATA[Yidana]]></modeler:assignee-info-lastname>
+        <modeler:initiator-can-complete xmlns:modeler="http://flowable.org/modeler"><![CDATA[false]]></modeler:initiator-can-complete>
+      </extensionElements>
+    </userTask>
+    <userTask id="approvalTask" name="Approval Task" flowable:assignee="${approver}" flowable:formKey="approveLeaveRequest" flowable:formFieldValidation="true">
+      <extensionElements>
+        <flowable:executionListener event="end" expression="${approveleaverequest == 'No' ? execution.setVariable('rejected', true) : null}"></flowable:executionListener>
+        <modeler:initiator-can-complete xmlns:modeler="http://flowable.org/modeler"><![CDATA[false]]></modeler:initiator-can-complete>
+      </extensionElements>
+      <multiInstanceLoopCharacteristics isSequential="true" flowable:collection="approverList" flowable:elementVariable="approver">
+        <extensionElements></extensionElements>
+        <loopCardinality>${approverList.size()}</loopCardinality>
+        <completionCondition>${rejected == true}</completionCondition>
+      </multiInstanceLoopCharacteristics>
+    </userTask>
+    <sequenceFlow id="sid-6529046A-CA6C-4DDE-A7ED-7F76CD2D7DBF" sourceRef="startEvent1" targetRef="submitLeaveRequest"></sequenceFlow>
+    <sequenceFlow id="sid-73FE5A29-18FA-479D-A114-6C85A39B35BA" sourceRef="submitLeaveRequest" targetRef="approvalTask"></sequenceFlow>
+    <exclusiveGateway id="sid-4D0C415A-BC8F-4DC0-8E4A-31DB89A63BB7"></exclusiveGateway>
+    <sequenceFlow id="sid-C814CCD4-6D75-4032-9C42-8E5343F61EB2" sourceRef="approvalTask" targetRef="sid-4D0C415A-BC8F-4DC0-8E4A-31DB89A63BB7"></sequenceFlow>
+    <endEvent id="sid-DC58399A-3F38-41BB-860B-BB11B92959D6"></endEvent>
+    <userTask id="acceptLeaveApproval" name="Accept Leave Approval" flowable:assignee="employee" flowable:formFieldValidation="true">
+      <extensionElements>
+        <modeler:activiti-idm-assignee xmlns:modeler="http://flowable.org/modeler"><![CDATA[true]]></modeler:activiti-idm-assignee>
+        <modeler:assignee-info-email xmlns:modeler="http://flowable.org/modeler"><![CDATA[eyidana002@gmail.com]]></modeler:assignee-info-email>
+        <modeler:assignee-info-firstname xmlns:modeler="http://flowable.org/modeler"><![CDATA[Emmanuel]]></modeler:assignee-info-firstname>
+        <modeler:assignee-info-lastname xmlns:modeler="http://flowable.org/modeler"><![CDATA[Yidana]]></modeler:assignee-info-lastname>
+        <modeler:initiator-can-complete xmlns:modeler="http://flowable.org/modeler"><![CDATA[false]]></modeler:initiator-can-complete>
+      </extensionElements>
+    </userTask>
+    <sequenceFlow id="sid-4261A4F3-3FB1-4E8F-9C5A-46BA7300E9CD" sourceRef="acceptLeaveApproval" targetRef="sid-DC58399A-3F38-41BB-860B-BB11B92959D6"></sequenceFlow>
+    <endEvent id="sid-E06A0CF9-195D-44F9-B697-83EC441F826B"></endEvent>
+    <sequenceFlow id="sid-8288836F-7387-4574-9DFE-0599A294E1FD" sourceRef="sid-4D0C415A-BC8F-4DC0-8E4A-31DB89A63BB7" targetRef="sid-E06A0CF9-195D-44F9-B697-83EC441F826B">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${rejected == true}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="sid-F3D5977B-5EF8-4D7A-951F-DDCD69E931B6" sourceRef="sid-4D0C415A-BC8F-4DC0-8E4A-31DB89A63BB7" targetRef="acceptLeaveApproval">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${rejected == false}]]></conditionExpression>
+    </sequenceFlow>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_leaveProcess">
+    <bpmndi:BPMNPlane bpmnElement="leaveProcess" id="BPMNPlane_leaveProcess">
+      <bpmndi:BPMNShape bpmnElement="startEvent1" id="BPMNShape_startEvent1">
+        <omgdc:Bounds height="30.0" width="30.0" x="30.000000422651148" y="158.00000466325102"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="submitLeaveRequest" id="BPMNShape_submitLeaveRequest">
+        <omgdc:Bounds height="80.0" width="99.99999999999997" x="195.00000274723246" y="120.00000169060459"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="approvalTask" id="BPMNShape_approvalTask">
+        <omgdc:Bounds height="80.0" width="99.99999999999994" x="435.0000061284416" y="135.00000190193015"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="sid-4D0C415A-BC8F-4DC0-8E4A-31DB89A63BB7" id="BPMNShape_sid-4D0C415A-BC8F-4DC0-8E4A-31DB89A63BB7">
+        <omgdc:Bounds height="40.0" width="40.0" x="630.0000088756741" y="150.00000211325573"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="sid-DC58399A-3F38-41BB-860B-BB11B92959D6" id="BPMNShape_sid-DC58399A-3F38-41BB-860B-BB11B92959D6">
+        <omgdc:Bounds height="28.0" width="28.0" x="960.0000135248367" y="87.00000264861387"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="acceptLeaveApproval" id="BPMNShape_acceptLeaveApproval">
+        <omgdc:Bounds height="80.0" width="100.0" x="784.1818354827323" y="61.00000142292552"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="sid-E06A0CF9-195D-44F9-B697-83EC441F826B" id="BPMNShape_sid-E06A0CF9-195D-44F9-B697-83EC441F826B">
+        <omgdc:Bounds height="28.0" width="28.0" x="780.0000109889298" y="225.0000031698836"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="sid-C814CCD4-6D75-4032-9C42-8E5343F61EB2" id="BPMNEdge_sid-C814CCD4-6D75-4032-9C42-8E5343F61EB2" flowable:sourceDockerX="49.99999999999997" flowable:sourceDockerY="40.0" flowable:targetDockerX="20.0" flowable:targetDockerY="20.0">
+        <omgdi:waypoint x="534.9500061284205" y="175.00000190193015"></omgdi:waypoint>
+        <omgdi:waypoint x="590.0000076077206" y="175.00000190193015"></omgdi:waypoint>
+        <omgdi:waypoint x="590.0000076077206" y="170.00000211325573"></omgdi:waypoint>
+        <omgdi:waypoint x="630.0000088756741" y="170.00000211325573"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-6529046A-CA6C-4DDE-A7ED-7F76CD2D7DBF" id="BPMNEdge_sid-6529046A-CA6C-4DDE-A7ED-7F76CD2D7DBF" flowable:sourceDockerX="15.0" flowable:sourceDockerY="15.0" flowable:targetDockerX="49.999999999999986" flowable:targetDockerY="40.0">
+        <omgdi:waypoint x="59.949997738960846" y="173.00000466325102"></omgdi:waypoint>
+        <omgdi:waypoint x="127.5000015849418" y="173.00000466325102"></omgdi:waypoint>
+        <omgdi:waypoint x="127.5000015849418" y="160.0000016906046"></omgdi:waypoint>
+        <omgdi:waypoint x="195.00000274723246" y="160.0000016906046"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-4261A4F3-3FB1-4E8F-9C5A-46BA7300E9CD" id="BPMNEdge_sid-4261A4F3-3FB1-4E8F-9C5A-46BA7300E9CD" flowable:sourceDockerX="50.0" flowable:sourceDockerY="40.0" flowable:targetDockerX="14.0" flowable:targetDockerY="14.0">
+        <omgdi:waypoint x="884.1318340562597" y="101.00000186080229"></omgdi:waypoint>
+        <omgdi:waypoint x="960.0000135248367" y="101.00000252588565"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-8288836F-7387-4574-9DFE-0599A294E1FD" id="BPMNEdge_sid-8288836F-7387-4574-9DFE-0599A294E1FD" flowable:sourceDockerX="20.5" flowable:sourceDockerY="20.5" flowable:targetDockerX="1.1818128119807625" flowable:targetDockerY="12.818173099647652">
+        <omgdi:waypoint x="663.0056526382988" y="176.94282772238367"></omgdi:waypoint>
+        <omgdi:waypoint x="780.0012163604191" y="237.21006164067646"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-F3D5977B-5EF8-4D7A-951F-DDCD69E931B6" id="BPMNEdge_sid-F3D5977B-5EF8-4D7A-951F-DDCD69E931B6" flowable:sourceDockerX="20.5" flowable:sourceDockerY="20.5" flowable:targetDockerX="1.0" flowable:targetDockerY="40.0">
+        <omgdi:waypoint x="663.6593701977635" y="163.69234429078907"></omgdi:waypoint>
+        <omgdi:waypoint x="784.1818354827323" y="101.49023089425907"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-73FE5A29-18FA-479D-A114-6C85A39B35BA" id="BPMNEdge_sid-73FE5A29-18FA-479D-A114-6C85A39B35BA" flowable:sourceDockerX="49.999999999999986" flowable:sourceDockerY="40.0" flowable:targetDockerX="49.99999999999997" flowable:targetDockerY="40.0">
+        <omgdi:waypoint x="294.9500027472325" y="160.0000016906046"></omgdi:waypoint>
+        <omgdi:waypoint x="373.0000080796811" y="160.0000016906046"></omgdi:waypoint>
+        <omgdi:waypoint x="373.0000080796811" y="175.00000190193015"></omgdi:waypoint>
+        <omgdi:waypoint x="435.0000061284369" y="175.00000190193015"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>
