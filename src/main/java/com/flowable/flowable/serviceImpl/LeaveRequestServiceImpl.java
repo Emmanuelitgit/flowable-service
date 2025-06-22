@@ -1,6 +1,7 @@
 package com.flowable.flowable.serviceImpl;
 
 import com.flowable.flowable.dto.TaskDTO;
+import lombok.extern.slf4j.Slf4j;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
@@ -8,11 +9,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 public class LeaveRequestServiceImpl {
 
@@ -27,16 +30,16 @@ public class LeaveRequestServiceImpl {
     }
 
     /**
-     * @description this method is used to start or initiate a process.
+     * @description this method is used to start or initiate a process instance.
      * @Auther Emmanuel Yidana
      * @param
      * @return returns ResponseEntity containing the tasks response.
      * @Date 22/06/2025
      */
-    public void startLeaveProcess() {
-        Map<String, Object> vars = new HashMap<>();
-        vars.put("approverList", List.of("manager", "hr"));
+    public void startLeaveProcess(Map<String, Object> vars) {
+        vars.put("approverList", List.of("manager", "gm", "hr"));
         vars.put("rejected", false);
+        vars.put("approveleaverequest", null);
         runtimeService.startProcessInstanceByKey("leaveProcess", vars);
     }
 
@@ -78,12 +81,32 @@ public class LeaveRequestServiceImpl {
     /**
      * @description this method is used to complete a task by a user given the task id and some metadata thus the variable.
      * @Auther Emmanuel Yidana
-     * @param taskId
      * @param variables
      * @return returns ResponseEntity containing the tasks response.
      * @Date 22/06/2025
      */
-    public void completeTask(String taskId, Map<String, Object> variables) {
-        taskService.complete(taskId, variables);
+    public void completeTask(Map<String, Object> variables) {
+
+        /** retrieve a task given the leaveId **/
+
+        Task task = taskService.createTaskQuery()
+                .processVariableValueEquals("leaveId", variables.get("leaveId"))
+                .singleResult();
+
+      if (task != null){
+          if (task.getName().equalsIgnoreCase("Approval Task")){
+              log.info("In task approval:->>>>>");
+              if (variables.isEmpty()){
+                  throw new ResponseStatusException(HttpStatusCode.valueOf(400), "variables cannot be null for task approval");
+              }
+              taskService.complete(task.getId(), variables);
+          }else {
+              log.info("In submit leave request:->>>>>");
+              taskService.complete(task.getId());
+          }
+      }else {
+          throw new ResponseStatusException(HttpStatusCode.valueOf(404), "task cannot be found");
+      }
+
     }
 }

@@ -16,8 +16,8 @@ public class LeaveRequestRest {
     private LeaveRequestServiceImpl leaveRequestService;
 
     @PostMapping("/start")
-    public ResponseEntity<?> startProcess() {
-        leaveRequestService.startLeaveProcess();
+    public ResponseEntity<?> startProcess(@RequestBody Map<String, Object> vars) {
+        leaveRequestService.startLeaveProcess(vars);
         return ResponseEntity.ok("Leave process started");
     }
 
@@ -31,10 +31,9 @@ public class LeaveRequestRest {
         return leaveRequestService.getTasksForUser(username);
     }
 
-    @PostMapping("/tasks/{taskId}/complete")
-    public ResponseEntity<?> completeTask(@PathVariable String taskId,
-                                          @RequestBody Map<String, Object> variables) {
-        leaveRequestService.completeTask(taskId, variables);
+    @PostMapping("/tasks/complete")
+    public ResponseEntity<?> completeTask(@RequestBody Map<String, Object> variables) {
+        leaveRequestService.completeTask(variables);
         return ResponseEntity.ok("Task completed");
     }
 }
