@@ -64,43 +64,27 @@ public class LeaveRequestServiceImpl {
         Task task = taskService.createTaskQuery()
                 .processVariableValueEquals(tmsUpdatePayload.getLeaveId())
                 .singleResult();
+
         if (task != null){
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),"An active task alredy in use with the given id:->>>>{}");
         }
 
         /** check application type */
 
-        if (tmsUpdatePayload.getApplicationType().equalsIgnoreCase("TMS")){
+        log.info("About to start approval workflow for TMS:->>>>");
 
-            log.info("About to start approval workflow for TMS:->>>>");
+        List<TMSWorkFlow> workFlows = tmsWorkFlowRepo.findByApplicationTypeOrderByPriorityAsc(tmsUpdatePayload.getApplicationType());
 
-            List<TMSWorkFlow> workFlows = tmsWorkFlowRepo.findAll();
+        List<String> sortedWorkflows = workFlows.stream()
+                .sorted(Comparator.comparing(TMSWorkFlow::getPriority))
+                .map(TMSWorkFlow::getName)
+                .collect(Collectors.toList());
 
-            List<String> sortedWorkflows = workFlows.stream()
-                    .sorted(Comparator.comparing(TMSWorkFlow::getPriority))
-                    .map(TMSWorkFlow::getName)
-                    .collect(Collectors.toList()); // mutable list
-
-            if (!sortedWorkflows.isEmpty()) {
-                sortedWorkflows.remove(sortedWorkflows.size() - 1);
-            }
-
-            variables.put("approverList", sortedWorkflows);
-
-
-        } else if (variables.get("applicationType").equals("ESS")) {
-
-            log.info("About to start approval workflow for ESS:->>>>");
-
-            List<ESSWorkFlow> workFlows = essWorkFlowRepo.findAll();
-
-            List<String> sortedWorkflows = workFlows.stream()
-                    .sorted(Comparator.comparing(ESSWorkFlow::getPriority))
-                    .map(ESSWorkFlow::getName)
-                    .toList();
-
-            variables.put("approverList", sortedWorkflows);
+        if (!sortedWorkflows.isEmpty()) {
+            sortedWorkflows.remove(sortedWorkflows.size() - 1);
         }
+
+        variables.put("approverList", sortedWorkflows);
 
         runtimeService.startProcessInstanceByKey("leaveProcess", variables);
 

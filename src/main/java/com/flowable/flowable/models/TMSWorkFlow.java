@@ -12,6 +12,7 @@ public class TMSWorkFlow {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+    private String applicationType;
     private String name;
     private Integer priority;
 }
