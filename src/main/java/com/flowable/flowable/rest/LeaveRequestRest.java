@@ -1,5 +1,6 @@
 package com.flowable.flowable.rest;
 
+import com.flowable.flowable.config.kafka.dto.TMSUpdatePayload;
 import com.flowable.flowable.serviceImpl.LeaveRequestServiceImpl;
 import org.flowable.task.api.Task;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,8 +17,8 @@ public class LeaveRequestRest {
     private LeaveRequestServiceImpl leaveRequestService;
 
     @PostMapping("/start")
-    public ResponseEntity<?> startProcess(@RequestBody Map<String, Object> vars) {
-        leaveRequestService.startLeaveProcess(vars);
+    public ResponseEntity<?> startProcess(@RequestBody TMSUpdatePayload tmsUpdatePayload) {
+        leaveRequestService.startLeaveProcess(tmsUpdatePayload);
         return ResponseEntity.ok("Leave process started");
     }
 
@@ -32,8 +33,8 @@ public class LeaveRequestRest {
     }
 
     @PostMapping("/tasks/complete")
-    public ResponseEntity<?> completeTask(@RequestBody Map<String, Object> variables) {
-        leaveRequestService.completeTask(variables);
+    public ResponseEntity<?> completeTask(@RequestBody TMSUpdatePayload tmsUpdatePayload) {
+        leaveRequestService.completeTask(tmsUpdatePayload);
         return ResponseEntity.ok("Task completed");
     }
 }
