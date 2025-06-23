@@ -2,10 +2,10 @@ package com.flowable.flowable.serviceImpl;
 
 import com.flowable.flowable.config.kafka.dto.TMSUpdatePayload;
 import com.flowable.flowable.dto.TaskDTO;
-import com.flowable.flowable.models.ESSWorkFlow;
-import com.flowable.flowable.models.TMSWorkFlow;
-import com.flowable.flowable.repo.ESSWorkFlowRepo;
-import com.flowable.flowable.repo.TMSWorkFlowRepo;
+import com.flowable.flowable.models.ApplicationType;
+import com.flowable.flowable.models.WorkFlow;
+import com.flowable.flowable.repo.ApplicationTypeRepo;
+import com.flowable.flowable.repo.WorkFlowRepo;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
@@ -32,18 +32,18 @@ public class LeaveRequestServiceImpl {
 
     private final TaskService taskService;
 
-    private final TMSWorkFlowRepo tmsWorkFlowRepo;
+    private final WorkFlowRepo workFlowRepo;
 
-    private final ESSWorkFlowRepo essWorkFlowRepo;
+    private final ApplicationTypeRepo applicationTypeRepo;
 
     private final KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate;
 
     @Autowired
-    public LeaveRequestServiceImpl(RuntimeService runtimeService, TaskService taskService, TMSWorkFlowRepo tmsWorkFlowRepo, ESSWorkFlowRepo essWorkFlowRepo, KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate) {
+    public LeaveRequestServiceImpl(RuntimeService runtimeService, TaskService taskService, WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo, KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate) {
         this.runtimeService = runtimeService;
         this.taskService = taskService;
-        this.tmsWorkFlowRepo = tmsWorkFlowRepo;
-        this.essWorkFlowRepo = essWorkFlowRepo;
+        this.workFlowRepo = workFlowRepo;
+        this.applicationTypeRepo = applicationTypeRepo;
         this.kafkaTemplate = kafkaTemplate;
     }
 
@@ -54,7 +54,7 @@ public class LeaveRequestServiceImpl {
      * @return returns ResponseEntity containing the tasks response.
      * @Date 22/06/2025
      */
-    @KafkaListener(topics = "tms-start-update", containerFactory = "KafkaListenerContainerFactory", groupId = "tms-group")
+    @KafkaListener(topics = "start-process-update", containerFactory = "KafkaListenerContainerFactory", groupId = "tms-group")
     public void startLeaveProcess(TMSUpdatePayload tmsUpdatePayload) {
 
         Map<String, Object> variables = processVariables(tmsUpdatePayload);
@@ -71,13 +71,14 @@ public class LeaveRequestServiceImpl {
 
         /** check application type */
 
-        log.info("About to start approval workflow for TMS:->>>>");
+        log.info("About to start approval workflow for {}:->>>>", tmsUpdatePayload.getApplicationType());
 
-        List<TMSWorkFlow> workFlows = tmsWorkFlowRepo.findByApplicationTypeOrderByPriorityAsc(tmsUpdatePayload.getApplicationType());
+        ApplicationType applicationType = applicationTypeRepo.findByName(tmsUpdatePayload.getApplicationType());
+        List<WorkFlow> workFlows = workFlowRepo.findByApplicationIdOrderByPriorityAsc(applicationType.getId());
 
         List<String> sortedWorkflows = workFlows.stream()
-                .sorted(Comparator.comparing(TMSWorkFlow::getPriority))
-                .map(TMSWorkFlow::getName)
+                .sorted(Comparator.comparing(WorkFlow::getPriority))
+                .map(WorkFlow::getName)
                 .collect(Collectors.toList());
 
         if (!sortedWorkflows.isEmpty()) {
@@ -88,7 +89,7 @@ public class LeaveRequestServiceImpl {
 
         runtimeService.startProcessInstanceByKey("leaveProcess", variables);
 
-        kafkaTemplate.send("tms-update", tmsUpdatePayload);
+        kafkaTemplate.send( "complete-task-update", tmsUpdatePayload);
     }
 
     /**
@@ -139,7 +140,7 @@ public class LeaveRequestServiceImpl {
      * @return returns ResponseEntity containing the tasks response.
      * @Date 22/06/2025
      */
-    @KafkaListener(topics = "tms-update", containerFactory="KafkaListenerContainerFactory", groupId = "tms-group")
+    @KafkaListener(topics = "complete-task-update", containerFactory="KafkaListenerContainerFactory", groupId = "tms-group")
     public void completeTask(TMSUpdatePayload tmsUpdatePayload) {
 
         Map<String, Object> variables = new HashMap<>();
@@ -164,11 +165,11 @@ public class LeaveRequestServiceImpl {
 
              if (tmsUpdatePayload.getApproveleaverequest().equalsIgnoreCase("Yes")){
 
-                 List<TMSWorkFlow> workFlows = tmsWorkFlowRepo.findAll();
+                 List<WorkFlow> workFlows = workFlowRepo.findAll();
 
                  List<String> sortedWorkflows = workFlows.stream()
-                         .sorted(Comparator.comparing(TMSWorkFlow::getPriority))
-                         .map(TMSWorkFlow::getName)
+                         .sorted(Comparator.comparing(WorkFlow::getPriority))
+                         .map(WorkFlow::getName)
                          .toList();
 
                  String updatedStatus = "";

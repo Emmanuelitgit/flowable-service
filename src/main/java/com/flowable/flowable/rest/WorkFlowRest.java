@@ -1,7 +1,7 @@
 package com.flowable.flowable.rest;
 
-import com.flowable.flowable.models.TMSWorkFlow;
-import com.flowable.flowable.serviceImpl.TMSWorkFlowServiceImpl;
+import com.flowable.flowable.models.WorkFlow;
+import com.flowable.flowable.serviceImpl.WorkFlowServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -10,12 +10,12 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/work-flow/tms")
-public class TMSWorkFlowRest {
+public class WorkFlowRest {
 
-    private final TMSWorkFlowServiceImpl tmsWorkFlowService;
+    private final WorkFlowServiceImpl tmsWorkFlowService;
 
     @Autowired
-    public TMSWorkFlowRest(TMSWorkFlowServiceImpl tmsWorkFlowService) {
+    public WorkFlowRest(WorkFlowServiceImpl tmsWorkFlowService) {
         this.tmsWorkFlowService = tmsWorkFlowService;
     }
 
@@ -25,13 +25,13 @@ public class TMSWorkFlowRest {
     }
 
     @PostMapping
-    private ResponseEntity<Object> saveSetup(@RequestBody TMSWorkFlow tmsWorkFlow){
-        return tmsWorkFlowService.saveSetup(tmsWorkFlow);
+    private ResponseEntity<Object> saveSetup(@RequestBody WorkFlow workFlow){
+        return tmsWorkFlowService.saveSetup(workFlow);
     }
 
     @PutMapping
-    private ResponseEntity<Object> updateSetup(@RequestBody TMSWorkFlow tmsWorkFlow){
-        return tmsWorkFlowService.updateSetup(tmsWorkFlow);
+    private ResponseEntity<Object> updateSetup(@RequestBody WorkFlow workFlow){
+        return tmsWorkFlowService.updateSetup(workFlow);
     }
 
     @DeleteMapping("/{id}")

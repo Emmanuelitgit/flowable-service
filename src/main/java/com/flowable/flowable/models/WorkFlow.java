@@ -7,12 +7,12 @@ import java.util.UUID;
 
 @Entity
 @Data
-@Table(name = "tms_flow_setup_tb")
-public class TMSWorkFlow {
+@Table(name = "work_flow_tb")
+public class WorkFlow {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    private String applicationType;
+    private UUID applicationId;
     private String name;
     private Integer priority;
 }
