@@ -6,10 +6,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/work-flow/tms")
+@RequestMapping("/api/v1/work-flow")
 public class WorkFlowRest {
 
     private final WorkFlowServiceImpl tmsWorkFlowService;
@@ -25,8 +26,8 @@ public class WorkFlowRest {
     }
 
     @PostMapping
-    private ResponseEntity<Object> saveSetup(@RequestBody WorkFlow workFlow){
-        return tmsWorkFlowService.saveSetup(workFlow);
+    private ResponseEntity<Object> saveSetup(@RequestBody List<WorkFlow> workFlows){
+        return tmsWorkFlowService.saveSetup(workFlows);
     }
 
     @PutMapping

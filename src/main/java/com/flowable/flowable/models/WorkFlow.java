@@ -15,4 +15,5 @@ public class WorkFlow {
     private UUID applicationId;
     private String name;
     private Integer priority;
+    private String onCompletedStatus;
 }

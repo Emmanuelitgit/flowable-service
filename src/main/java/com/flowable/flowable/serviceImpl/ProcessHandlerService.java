@@ -2,6 +2,7 @@ package com.flowable.flowable.serviceImpl;
 
 import com.flowable.flowable.config.kafka.dto.TMSUpdatePayload;
 import com.flowable.flowable.dto.TaskDTO;
+import com.flowable.flowable.exception.BadRequestException;
 import com.flowable.flowable.models.ApplicationType;
 import com.flowable.flowable.models.WorkFlow;
 import com.flowable.flowable.repo.ApplicationTypeRepo;
@@ -16,7 +17,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-public class LeaveRequestServiceImpl {
+public class ProcessHandlerService {
 
     private final RuntimeService runtimeService;
 
@@ -39,7 +39,7 @@ public class LeaveRequestServiceImpl {
     private final KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate;
 
     @Autowired
-    public LeaveRequestServiceImpl(RuntimeService runtimeService, TaskService taskService, WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo, KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate) {
+    public ProcessHandlerService(RuntimeService runtimeService, TaskService taskService, WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo, KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate) {
         this.runtimeService = runtimeService;
         this.taskService = taskService;
         this.workFlowRepo = workFlowRepo;
@@ -66,13 +66,14 @@ public class LeaveRequestServiceImpl {
                 .singleResult();
 
         if (task != null){
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),"An active task alredy in use with the given id:->>>>{}");
+            throw new BadRequestException("An active task already in use with the given id:"+tmsUpdatePayload.getLeaveId());
         }
 
         /** check application type */
 
         log.info("About to start approval workflow for {}:->>>>", tmsUpdatePayload.getApplicationType());
 
+        // load the approval flow from the db sorted in ascending order by the priority
         ApplicationType applicationType = applicationTypeRepo.findByName(tmsUpdatePayload.getApplicationType());
         List<WorkFlow> workFlows = workFlowRepo.findByApplicationIdOrderByPriorityAsc(applicationType.getId());
 
@@ -155,39 +156,60 @@ public class LeaveRequestServiceImpl {
                 .processVariableValueEquals(tmsUpdatePayload.getLeaveId())
                 .singleResult();
 
+        // Fetch process instance ID from the task
+        String processInstanceId = task.getProcessInstanceId();
+
+        // Get the applicationType variable from the process instance
+        String applicationType = (String) runtimeService
+                .getVariable(processInstanceId, "applicationType")
+                .toString()
+                .toLowerCase();
+
+        log.info("App:>>>{}", applicationType);
+
+        log.info("Application Type from process variables: {}", applicationType);
+
       if (task != null){
           if (task.getName().equalsIgnoreCase("Approval Task")){
               log.info("In task approval:->>>>>");
               if (variables.isEmpty()){
-                  throw new ResponseStatusException(HttpStatusCode.valueOf(400), "variables cannot be null for task approval");
+                  throw new BadRequestException("variables cannot be null for task approval");
               }
 
 
              if (tmsUpdatePayload.getApproveleaverequest().equalsIgnoreCase("Yes")){
 
-                 List<WorkFlow> workFlows = workFlowRepo.findAll();
+                 ApplicationType appType = applicationTypeRepo.findByName(applicationType.toUpperCase());
+                 List<WorkFlow> workFlows = workFlowRepo.findByApplicationIdOrderByPriorityAsc(appType.getId());
 
-                 List<String> sortedWorkflows = workFlows.stream()
-                         .sorted(Comparator.comparing(WorkFlow::getPriority))
-                         .map(WorkFlow::getName)
-                         .toList();
 
-                 String updatedStatus = "";
-                 for (int i=0; i<sortedWorkflows.size(); i++){
-                     if (sortedWorkflows.get(i).equalsIgnoreCase(task.getAssignee()) ){
-                         updatedStatus = sortedWorkflows.get(i+1);
+                 String updatedStatus = null;
+
+                 // the loop is used to ge the nest status
+                 for (int i = 0; i < workFlows.size(); i++) {
+                     if (workFlows.get(i).getName().equalsIgnoreCase(task.getAssignee())) {
+                         if (i + 1 < workFlows.size()) {
+                             updatedStatus = workFlows.get(i + 1).getName();
+                         } else {
+                             updatedStatus = workFlows.get(i).getOnCompletedStatus() != null
+                                     ? workFlows.get(i).getOnCompletedStatus()
+                                     : "COMPLETED";
+                         }
+                         break;
                      }
                  }
+
 
                  log.info("Updated status:->>>>{}", updatedStatus);
 
                  TMSUpdatePayload tmsUpdatePayloadBuilder = TMSUpdatePayload
                          .builder()
-                         .status("PENDING_"+updatedStatus.toUpperCase()+"_APPROVAL")
+                         .status(updatedStatus.toUpperCase())
                          .leaveId(tmsUpdatePayload.getLeaveId())
                          .build();
 
-                 kafkaTemplate.send("flowable-update", tmsUpdatePayloadBuilder);
+
+                 kafkaTemplate.send(applicationType+"-flowable-update", tmsUpdatePayloadBuilder);
 
              } else if (tmsUpdatePayload.getApproveleaverequest().equalsIgnoreCase("No")) {
 
@@ -197,7 +219,7 @@ public class LeaveRequestServiceImpl {
                          .leaveId(tmsUpdatePayload.getLeaveId())
                          .build();
 
-                 kafkaTemplate.send("flowable-update", tmsUpdatePayloadBuilder);
+                 kafkaTemplate.send(applicationType+"-flowable-update", tmsUpdatePayloadBuilder);
 
              }
 
@@ -208,7 +230,7 @@ public class LeaveRequestServiceImpl {
               taskService.complete(task.getId());
           }
       }else {
-          throw new ResponseStatusException(HttpStatusCode.valueOf(404), "task cannot be found");
+          throw new BadRequestException("task cannot be found");
       }
 
     }

@@ -53,11 +53,15 @@ public class ApplicationTypeServiceImpl {
      * @Date 23/06/2025
      */
     public ResponseEntity<ResponseDTO> saveApplicationType(ApplicationType applicationType){
+
         ApplicationType existingData = applicationTypeRepo.findByName(applicationType.getName());
 
         if (existingData != null){
             throw new AlreadyExistException("application type already exist");
         }
+
+        //convert name to uppercase
+        applicationType.setName(applicationType.getName().toUpperCase());
 
         ResponseDTO responseDTO = AppUtils.getResponseDto("application type created", HttpStatus.CREATED, applicationTypeRepo.save(applicationType));
 
