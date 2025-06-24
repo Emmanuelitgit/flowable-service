@@ -3,9 +3,12 @@ package com.flowable.flowable.serviceImpl;
 import com.flowable.flowable.config.kafka.dto.TMSUpdatePayload;
 import com.flowable.flowable.dto.TaskDTO;
 import com.flowable.flowable.exception.BadRequestException;
+import com.flowable.flowable.exception.NotFoundException;
 import com.flowable.flowable.models.ApplicationType;
+import com.flowable.flowable.models.CompleteStatus;
 import com.flowable.flowable.models.WorkFlow;
 import com.flowable.flowable.repo.ApplicationTypeRepo;
+import com.flowable.flowable.repo.CompleteStatusRepo;
 import com.flowable.flowable.repo.WorkFlowRepo;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.engine.RuntimeService;
@@ -18,10 +21,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -38,13 +38,16 @@ public class ProcessHandlerService {
 
     private final KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate;
 
+    private final CompleteStatusRepo completeStatusRepo;
+
     @Autowired
-    public ProcessHandlerService(RuntimeService runtimeService, TaskService taskService, WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo, KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate) {
+    public ProcessHandlerService(RuntimeService runtimeService, TaskService taskService, WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo, KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate, CompleteStatusRepo completeStatusRepo) {
         this.runtimeService = runtimeService;
         this.taskService = taskService;
         this.workFlowRepo = workFlowRepo;
         this.applicationTypeRepo = applicationTypeRepo;
         this.kafkaTemplate = kafkaTemplate;
+        this.completeStatusRepo = completeStatusRepo;
     }
 
     /**
@@ -82,9 +85,9 @@ public class ProcessHandlerService {
                 .map(WorkFlow::getName)
                 .collect(Collectors.toList());
 
-        if (!sortedWorkflows.isEmpty()) {
-            sortedWorkflows.remove(sortedWorkflows.size() - 1);
-        }
+//        if (!sortedWorkflows.isEmpty()) {
+//            sortedWorkflows.remove(sortedWorkflows.size() - 1);
+//        }
 
         variables.put("approverList", sortedWorkflows);
 
@@ -156,6 +159,9 @@ public class ProcessHandlerService {
                 .processVariableValueEquals(tmsUpdatePayload.getLeaveId())
                 .singleResult();
 
+        if (task == null){
+            throw new NotFoundException("no active task found for:->>"+tmsUpdatePayload.getLeaveId());
+        }
         // Fetch process instance ID from the task
         String processInstanceId = task.getProcessInstanceId();
 
@@ -165,73 +171,71 @@ public class ProcessHandlerService {
                 .toString()
                 .toLowerCase();
 
-        log.info("App:>>>{}", applicationType);
 
         log.info("Application Type from process variables: {}", applicationType);
 
-      if (task != null){
-          if (task.getName().equalsIgnoreCase("Approval Task")){
-              log.info("In task approval:->>>>>");
-              if (variables.isEmpty()){
-                  throw new BadRequestException("variables cannot be null for task approval");
-              }
+
+        if (task.getName().equalsIgnoreCase("Approval Task")){
+            log.info("In task approval:->>>>>");
+            if (variables.isEmpty()){
+                throw new BadRequestException("variables cannot be null for task approval");
+            }
 
 
-             if (tmsUpdatePayload.getApproveleaverequest().equalsIgnoreCase("Yes")){
+            if (tmsUpdatePayload.getApproveleaverequest().equalsIgnoreCase("Yes")){
 
-                 ApplicationType appType = applicationTypeRepo.findByName(applicationType.toUpperCase());
-                 List<WorkFlow> workFlows = workFlowRepo.findByApplicationIdOrderByPriorityAsc(appType.getId());
-
-
-                 String updatedStatus = null;
-
-                 // the loop is used to ge the nest status
-                 for (int i = 0; i < workFlows.size(); i++) {
-                     if (workFlows.get(i).getName().equalsIgnoreCase(task.getAssignee())) {
-                         if (i + 1 < workFlows.size()) {
-                             updatedStatus = workFlows.get(i + 1).getName();
-                         } else {
-                             updatedStatus = workFlows.get(i).getOnCompletedStatus() != null
-                                     ? workFlows.get(i).getOnCompletedStatus()
-                                     : "COMPLETED";
-                         }
-                         break;
-                     }
-                 }
+                ApplicationType appType = applicationTypeRepo.findByName(applicationType.toUpperCase());
+                List<WorkFlow> workFlows = workFlowRepo.findByApplicationIdOrderByPriorityAsc(appType.getId());
 
 
-                 log.info("Updated status:->>>>{}", updatedStatus);
+                String updatedStatus = null;
 
-                 TMSUpdatePayload tmsUpdatePayloadBuilder = TMSUpdatePayload
-                         .builder()
-                         .status(updatedStatus.toUpperCase())
-                         .leaveId(tmsUpdatePayload.getLeaveId())
-                         .build();
+                // the loop is used to ge the nest status
+                for (int i = 0; i < workFlows.size(); i++) {
+                    if (workFlows.get(i).getName().equalsIgnoreCase(task.getAssignee())) {
+                        if (i + 1 < workFlows.size()) {
+                            updatedStatus = workFlows.get(i + 1).getName();
+                        } else {
+                            updatedStatus = workFlows.get(i).getApplicationId() != null
+                                    ? getCompeteStatus(workFlows.get(i).getApplicationId()).getOnSuccess()
+                                    : "COMPLETED";
+                        }
+                        break;
+                    }
+                }
 
 
-                 kafkaTemplate.send(applicationType+"-flowable-update", tmsUpdatePayloadBuilder);
+                log.info("Updated status:->>>>{}", updatedStatus);
 
-             } else if (tmsUpdatePayload.getApproveleaverequest().equalsIgnoreCase("No")) {
+                TMSUpdatePayload tmsUpdatePayloadBuilder = TMSUpdatePayload
+                        .builder()
+                        .status(updatedStatus.toUpperCase())
+                        .leaveId(tmsUpdatePayload.getLeaveId())
+                        .build();
 
-                 TMSUpdatePayload tmsUpdatePayloadBuilder = TMSUpdatePayload
-                         .builder()
-                         .status("REJECTED")
-                         .leaveId(tmsUpdatePayload.getLeaveId())
-                         .build();
 
-                 kafkaTemplate.send(applicationType+"-flowable-update", tmsUpdatePayloadBuilder);
+                kafkaTemplate.send(applicationType+"-flowable-update", tmsUpdatePayloadBuilder);
 
-             }
+            } else if (tmsUpdatePayload.getApproveleaverequest().equalsIgnoreCase("No")) {
 
-              taskService.complete(task.getId(), variables);
+                UUID applicationId = applicationTypeRepo.findByName(applicationType.toUpperCase()).getId();
 
-          }else {
-              log.info("In submit leave request:->>>>>");
-              taskService.complete(task.getId());
-          }
-      }else {
-          throw new BadRequestException("task cannot be found");
-      }
+                TMSUpdatePayload tmsUpdatePayloadBuilder = TMSUpdatePayload
+                        .builder()
+                        .status(getCompeteStatus(applicationId).getOnRejection())
+                        .leaveId(tmsUpdatePayload.getLeaveId())
+                        .build();
+
+                kafkaTemplate.send(applicationType+"-flowable-update", tmsUpdatePayloadBuilder);
+
+            }
+
+            taskService.complete(task.getId(), variables);
+
+        }else {
+            log.info("In submit leave request:->>>>>");
+            taskService.complete(task.getId());
+        }
 
     }
 
@@ -254,5 +258,9 @@ public class ProcessHandlerService {
         variables.put("requestType", tmsUpdatePayload.getRequestType());
 
         return variables;
+    }
+
+    public CompleteStatus getCompeteStatus(UUID id){
+        return completeStatusRepo.findByApplicationId(id);
     }
 }

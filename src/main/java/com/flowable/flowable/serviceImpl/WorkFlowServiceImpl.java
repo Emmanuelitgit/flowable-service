@@ -1,10 +1,13 @@
 package com.flowable.flowable.serviceImpl;
 
+import com.flowable.flowable.dto.WorkFlowDTO;
 import com.flowable.flowable.exception.AlreadyExistException;
 import com.flowable.flowable.exception.NotFoundException;
 import com.flowable.flowable.models.ApplicationType;
+import com.flowable.flowable.models.CompleteStatus;
 import com.flowable.flowable.models.WorkFlow;
 import com.flowable.flowable.repo.ApplicationTypeRepo;
+import com.flowable.flowable.repo.CompleteStatusRepo;
 import com.flowable.flowable.repo.WorkFlowRepo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,10 +29,13 @@ public class WorkFlowServiceImpl {
 
     private final ApplicationTypeRepo applicationTypeRepo;
 
+    private final CompleteStatusRepo completeStatusRepo;
+
     @Autowired
-    public WorkFlowServiceImpl(WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo) {
+    public WorkFlowServiceImpl(WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo, CompleteStatusRepo completeStatusRepo) {
         this.workFlowRepo = workFlowRepo;
         this.applicationTypeRepo = applicationTypeRepo;
+        this.completeStatusRepo = completeStatusRepo;
     }
 
 
@@ -54,7 +60,7 @@ public class WorkFlowServiceImpl {
      * @return returns ResponseEntity containing the workflow response.
      * @Date 22/06/2025
      */
-    public ResponseEntity<Object> saveSetup(List<WorkFlow> workFlows){
+    public ResponseEntity<Object> saveSetup(List<WorkFlowDTO> workFlows){
 
         log.info("In save workflow method:->>");
 
@@ -65,17 +71,40 @@ public class WorkFlowServiceImpl {
             log.info("flow:->>{}", flow);
 
             // check if workflow name already exist
-            Optional<WorkFlow> isFlowExist = workFlowRepo.findByName(flow.getName());
+
+
+            WorkFlow workFlow = WorkFlow
+                    .builder()
+                    .name(flow.getFlow().getName())
+                    .applicationId(flow.getFlow().getApplicationId())
+                    .priority(flow.getFlow().getPriority())
+                    .build();
+
+            Optional<WorkFlow> isFlowExist = workFlowRepo.findByName(workFlow.getName());
 
             if (isFlowExist.isPresent()){
-                throw new AlreadyExistException("work flow name already exist:"+flow.getName());
+                throw new AlreadyExistException("work flow name already exist:"+workFlow.getName());
             }
 
             // check application availability
-            applicationTypeRepo.findById(flow.getApplicationId())
-                    .orElseThrow(()-> new NotFoundException("application given id cannot be found:"+flow.getApplicationId()));
+            applicationTypeRepo.findById(workFlow.getApplicationId())
+                    .orElseThrow(()-> new NotFoundException("application given id cannot be found:"+workFlow.getApplicationId()));
 
-             WorkFlow res = workFlowRepo.save(flow);
+             WorkFlow res = workFlowRepo.save(workFlow);
+
+             // saving complete status record
+            CompleteStatus completeStatus = CompleteStatus
+                    .builder()
+                    .onRejection(flow.getCompleteStatus().getOnRejection())
+                    .onSuccess(flow.getCompleteStatus().getOnSuccess())
+                    .applicationId(res.getApplicationId())
+                    .build();
+
+            CompleteStatus isStatusExist = completeStatusRepo.findByApplicationId(flow.getFlow().getApplicationId());
+             if (isStatusExist ==null){
+                 completeStatusRepo.save(completeStatus);
+             }
+
              flows.add(res);
         });
 

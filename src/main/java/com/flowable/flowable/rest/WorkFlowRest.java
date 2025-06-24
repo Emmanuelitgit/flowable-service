@@ -1,5 +1,6 @@
 package com.flowable.flowable.rest;
 
+import com.flowable.flowable.dto.WorkFlowDTO;
 import com.flowable.flowable.models.WorkFlow;
 import com.flowable.flowable.serviceImpl.WorkFlowServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +27,7 @@ public class WorkFlowRest {
     }
 
     @PostMapping
-    private ResponseEntity<Object> saveSetup(@RequestBody List<WorkFlow> workFlows){
+    private ResponseEntity<Object> saveSetup(@RequestBody List<WorkFlowDTO> workFlows){
         return tmsWorkFlowService.saveSetup(workFlows);
     }
 

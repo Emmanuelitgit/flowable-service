@@ -13,12 +13,12 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "work_flow_tb")
-public class WorkFlow {
+@Table(name = "complete_status_tb")
+public class CompleteStatus {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+    private String onSuccess;
+    private String onRejection;
     private UUID applicationId;
-    private String name;
-    private Integer priority;
 }
