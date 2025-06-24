@@ -116,23 +116,51 @@ public class WorkFlowServiceImpl {
     /**
      * @description this method is used to update a workflow record given the id and the payload.
      * @Auther Emmanuel Yidana
-     * @param workFlow
+     * @param workFlows
      * @return returns ResponseEntity containing the workflow response.
      * @Date 22/06/2025
      */
-    public ResponseEntity<Object> updateSetup(WorkFlow workFlow){
+    public ResponseEntity<Object> updateSetup(List<WorkFlowDTO> workFlows){
 
         log.info("In update workflow method:->>");
 
-        WorkFlow existingData = workFlowRepo.findById(workFlow.getId())
-                .orElseThrow(()-> new ResponseStatusException(HttpStatusCode.valueOf(404),"setup record cannot found"));
 
-        existingData.setName(workFlow.getName());
-        existingData.setPriority(workFlow.getPriority());
+        List<WorkFlow> flows = new ArrayList<>();
 
-        WorkFlow res = workFlowRepo.save(existingData);
+        workFlows.forEach((flow)->{
 
-        return new ResponseEntity<>(res, HttpStatusCode.valueOf(200));
+            // check if workflow exist
+            WorkFlow existingData = workFlowRepo.findById(flow.getId())
+                    .orElseThrow(()-> new ResponseStatusException(HttpStatusCode.valueOf(404),"setup record cannot found"));
+
+
+            // check application availability
+            applicationTypeRepo.findById(flow.getFlow().getApplicationId())
+                    .orElseThrow(()-> new NotFoundException("application given id cannot be found:"+flow.getFlow().getApplicationId()));
+
+            existingData.setName(flow.getFlow().getName());
+            existingData.setPriority(flow.getFlow().getPriority());
+
+            WorkFlow response = workFlowRepo.save(existingData);
+
+            // saving complete status record
+            CompleteStatus completeStatus = CompleteStatus
+                    .builder()
+                    .onRejection(flow.getCompleteStatus().getOnRejection())
+                    .onSuccess(flow.getCompleteStatus().getOnSuccess())
+                    .applicationId(response.getApplicationId())
+                    .build();
+
+            CompleteStatus isStatusExist = completeStatusRepo.findByApplicationId(flow.getFlow().getApplicationId());
+            if (isStatusExist ==null){
+                completeStatusRepo.save(completeStatus);
+            }
+
+            flows.add(response);
+        });
+
+
+        return new ResponseEntity<>(flows, HttpStatusCode.valueOf(200));
     }
 
 
