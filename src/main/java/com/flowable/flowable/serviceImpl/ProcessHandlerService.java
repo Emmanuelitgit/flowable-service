@@ -1,6 +1,7 @@
 package com.flowable.flowable.serviceImpl;
 
 import com.flowable.flowable.config.kafka.dto.TMSUpdatePayload;
+import com.flowable.flowable.dto.ResponseDTO;
 import com.flowable.flowable.dto.TaskDTO;
 import com.flowable.flowable.exception.BadRequestException;
 import com.flowable.flowable.exception.NotFoundException;
@@ -10,11 +11,13 @@ import com.flowable.flowable.models.WorkFlow;
 import com.flowable.flowable.repo.ApplicationTypeRepo;
 import com.flowable.flowable.repo.CompleteStatusRepo;
 import com.flowable.flowable.repo.WorkFlowRepo;
+import com.flowable.flowable.util.AppUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -103,7 +106,7 @@ public class ProcessHandlerService {
      * @return returns ResponseEntity containing the tasks response.
      * @Date 22/06/2025
      */
-    public ResponseEntity<Object> findAll(){
+    public ResponseEntity<ResponseDTO> findAll(){
 
         log.info("About to fetch all tasks:->>>>");
 
@@ -113,7 +116,9 @@ public class ProcessHandlerService {
                 .map(TaskDTO::new)
                 .toList();
 
-        return new ResponseEntity<>(dtos, HttpStatusCode.valueOf(200));
+        ResponseDTO responseDTO = AppUtils.getResponseDto("tasks details", HttpStatus.OK, dtos);
+
+        return new ResponseEntity<>(responseDTO, HttpStatusCode.valueOf(200));
     }
 
 
@@ -124,7 +129,7 @@ public class ProcessHandlerService {
      * @return returns ResponseEntity containing the tasks response.
      * @Date 22/06/2025
      */
-    public ResponseEntity<Object> getTasksForUser(String username) {
+    public ResponseEntity<ResponseDTO> getTasksForUser(String username) {
 
         log.info("About to fetch tasks for {}:->>>>", username);
 
@@ -134,7 +139,9 @@ public class ProcessHandlerService {
                 .map(TaskDTO::new)
                 .toList();
 
-        return new ResponseEntity<>(dtos, HttpStatusCode.valueOf(200));
+        ResponseDTO responseDTO = AppUtils.getResponseDto("User task details", HttpStatus.OK, dtos);
+
+        return new ResponseEntity<>(responseDTO, HttpStatusCode.valueOf(200));
     }
 
     /**
@@ -190,7 +197,7 @@ public class ProcessHandlerService {
 
                 String updatedStatus = null;
 
-                // the loop is used to ge the nest status
+                // the loop is used to get the nest status
                 for (int i = 0; i < workFlows.size(); i++) {
                     if (workFlows.get(i).getName().equalsIgnoreCase(task.getAssignee())) {
                         if (i + 1 < workFlows.size()) {
