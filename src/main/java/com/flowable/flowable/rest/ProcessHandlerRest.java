@@ -35,7 +35,7 @@ public class ProcessHandlerRest {
     public ResponseEntity<ResponseDTO> completeTask(@RequestBody TMSUpdatePayload tmsUpdatePayload) {
         leaveRequestService.completeTask(tmsUpdatePayload);
 
-        ResponseDTO responseDTO = AppUtils.getResponseDto("Task mcompleted successfully", HttpStatus.OK);
+        ResponseDTO responseDTO = AppUtils.getResponseDto("Task completed successfully", HttpStatus.OK);
 
         return  new ResponseEntity<>(responseDTO, HttpStatus.OK);
     }

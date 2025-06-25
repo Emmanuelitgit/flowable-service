@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -13,16 +14,16 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class WorkFlowDTO {
-    private UUID id;
-    private Data flow;
+    private List<Data> flow;
     private CompleteStatus completeStatus;
+    private UUID applicationId;
 
     @lombok.Data
     @Builder
     @AllArgsConstructor
     @NoArgsConstructor
     public static class Data{
-        private UUID applicationId;
+        private UUID id;
         private String name;
         private Integer priority;
     }

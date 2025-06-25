@@ -27,12 +27,12 @@ public class WorkFlowRest {
     }
 
     @PostMapping
-    private ResponseEntity<Object> saveSetup(@RequestBody List<WorkFlowDTO> workFlows){
+    private ResponseEntity<Object> saveSetup(@RequestBody WorkFlowDTO workFlows){
         return tmsWorkFlowService.saveSetup(workFlows);
     }
 
     @PutMapping
-    private ResponseEntity<Object> updateSetup(@RequestBody WorkFlow workFlow){
+    private ResponseEntity<Object> updateSetup(@RequestBody WorkFlowDTO workFlow){
         return tmsWorkFlowService.updateSetup(workFlow);
     }
 

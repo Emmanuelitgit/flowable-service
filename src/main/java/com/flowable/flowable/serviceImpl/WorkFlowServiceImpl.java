@@ -2,6 +2,7 @@ package com.flowable.flowable.serviceImpl;
 
 import com.flowable.flowable.dto.WorkFlowDTO;
 import com.flowable.flowable.exception.AlreadyExistException;
+import com.flowable.flowable.exception.BadRequestException;
 import com.flowable.flowable.exception.NotFoundException;
 import com.flowable.flowable.models.ApplicationType;
 import com.flowable.flowable.models.CompleteStatus;
@@ -16,10 +17,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Service
@@ -60,26 +59,26 @@ public class WorkFlowServiceImpl {
      * @return returns ResponseEntity containing the workflow response.
      * @Date 22/06/2025
      */
-    public ResponseEntity<Object> saveSetup(List<WorkFlowDTO> workFlows){
+    public ResponseEntity<Object> saveSetup(WorkFlowDTO workFlows){
 
         log.info("In save workflow method:->>");
 
         List<WorkFlow> flows = new ArrayList<>();
+        Map<String, Object> responseMap = new HashMap<>();
 
-        workFlows.forEach((flow)->{
+        workFlows.getFlow().forEach((flow)->{
 
             log.info("flow:->>{}", flow);
 
-            // check if workflow name already exist
-
-
+            // building payload
             WorkFlow workFlow = WorkFlow
                     .builder()
-                    .name(flow.getFlow().getName())
-                    .applicationId(flow.getFlow().getApplicationId())
-                    .priority(flow.getFlow().getPriority())
+                    .name(flow.getName())
+                    .applicationId(workFlows.getApplicationId())
+                    .priority(flow.getPriority())
                     .build();
 
+            // check if workflow name already exist
             Optional<WorkFlow> isFlowExist = workFlowRepo.findByName(workFlow.getName());
 
             if (isFlowExist.isPresent()){
@@ -87,29 +86,37 @@ public class WorkFlowServiceImpl {
             }
 
             // check application availability
-            applicationTypeRepo.findById(workFlow.getApplicationId())
-                    .orElseThrow(()-> new NotFoundException("application given id cannot be found:"+workFlow.getApplicationId()));
+            applicationTypeRepo.findById(workFlows.getApplicationId())
+                    .orElseThrow(()-> new NotFoundException("application given id cannot be found:"+workFlows.getApplicationId()));
 
              WorkFlow res = workFlowRepo.save(workFlow);
-
-             // saving complete status record
-            CompleteStatus completeStatus = CompleteStatus
-                    .builder()
-                    .onRejection(flow.getCompleteStatus().getOnRejection())
-                    .onSuccess(flow.getCompleteStatus().getOnSuccess())
-                    .applicationId(res.getApplicationId())
-                    .build();
-
-            CompleteStatus isStatusExist = completeStatusRepo.findByApplicationId(flow.getFlow().getApplicationId());
-             if (isStatusExist ==null){
-                 completeStatusRepo.save(completeStatus);
-             }
 
              flows.add(res);
         });
 
 
-        return new ResponseEntity<>(flows, HttpStatusCode.valueOf(201));
+        // saving complete status record
+        CompleteStatus completeStatus = CompleteStatus
+                .builder()
+                .onRejection(workFlows.getCompleteStatus().getOnRejection())
+                .onSuccess(workFlows.getCompleteStatus().getOnSuccess())
+                .applicationId(workFlows.getApplicationId())
+                .build();
+
+        CompleteStatus isStatusExist = completeStatusRepo.findByApplicationId(workFlows.getApplicationId());
+
+        Object completeStatusRes = null;
+
+        if (isStatusExist ==null){
+             completeStatusRes = completeStatusRepo.save(completeStatus);
+        }else {
+            completeStatusRes = isStatusExist;
+        }
+
+        responseMap.put("flows", flows);
+        responseMap.put("complete status", completeStatusRes);
+
+        return new ResponseEntity<>(responseMap, HttpStatusCode.valueOf(201));
     }
 
 
@@ -120,47 +127,58 @@ public class WorkFlowServiceImpl {
      * @return returns ResponseEntity containing the workflow response.
      * @Date 22/06/2025
      */
-    public ResponseEntity<Object> updateSetup(List<WorkFlowDTO> workFlows){
+    public ResponseEntity<Object> updateSetup(WorkFlowDTO workFlows){
 
         log.info("In update workflow method:->>");
 
-
         List<WorkFlow> flows = new ArrayList<>();
+        Map<String, Object> responseMap = new HashMap<>();
 
-        workFlows.forEach((flow)->{
+        AtomicReference<String> applicationType = new AtomicReference<>("");
 
-            // check if workflow exist
-            WorkFlow existingData = workFlowRepo.findById(flow.getId())
-                    .orElseThrow(()-> new ResponseStatusException(HttpStatusCode.valueOf(404),"setup record cannot found"));
+        workFlows.getFlow().forEach((flow)->{
 
+            log.info("About to update workflow record->>>>");
+
+            // check if work flow exist
+            WorkFlow existingFlow = workFlowRepo.findById(flow.getId())
+                    .orElseThrow(()-> new NotFoundException("work flow record cannot be found"));
 
             // check application availability
-            applicationTypeRepo.findById(flow.getFlow().getApplicationId())
-                    .orElseThrow(()-> new NotFoundException("application given id cannot be found:"+flow.getFlow().getApplicationId()));
+            ApplicationType application = applicationTypeRepo.findById(workFlows.getApplicationId())
+                    .orElseThrow(()-> new NotFoundException("application given id cannot be found:"+workFlows.getApplicationId()));
 
-            existingData.setName(flow.getFlow().getName());
-            existingData.setPriority(flow.getFlow().getPriority());
+            // getting the application type
+            applicationType.set(application.getName());
 
-            WorkFlow response = workFlowRepo.save(existingData);
+            // saving updated flow records
+            existingFlow.setName(flow.getName());
+            existingFlow.setPriority(flow.getPriority());
+            existingFlow.setApplicationId(workFlows.getApplicationId());
 
-            // saving complete status record
-            CompleteStatus completeStatus = CompleteStatus
-                    .builder()
-                    .onRejection(flow.getCompleteStatus().getOnRejection())
-                    .onSuccess(flow.getCompleteStatus().getOnSuccess())
-                    .applicationId(response.getApplicationId())
-                    .build();
+            WorkFlow flowResponse = workFlowRepo.save(existingFlow);
 
-            CompleteStatus isStatusExist = completeStatusRepo.findByApplicationId(flow.getFlow().getApplicationId());
-            if (isStatusExist ==null){
-                completeStatusRepo.save(completeStatus);
-            }
 
-            flows.add(response);
+            flows.add(flowResponse);
         });
 
 
-        return new ResponseEntity<>(flows, HttpStatusCode.valueOf(200));
+        // check if complete status exist by application id
+        CompleteStatus existingStatus = completeStatusRepo.findByApplicationId(workFlows.getApplicationId());
+
+        if (existingStatus == null){
+            throw new BadRequestException("cannot find existing complete status for:"+applicationType);
+        }
+
+        // saving updated complete status
+        existingStatus.setOnRejection(workFlows.getCompleteStatus().getOnRejection());
+        existingStatus.setOnSuccess(workFlows.getCompleteStatus().getOnSuccess());
+        CompleteStatus completeStatusRes = completeStatusRepo.save(existingStatus);
+
+        responseMap.put("flows", flows);
+        responseMap.put("complete status",completeStatusRes);
+
+        return new ResponseEntity<>(responseMap, HttpStatusCode.valueOf(200));
     }
 
 
