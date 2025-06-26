@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class TMSUpdatePayload {
+public class UpdatePayload {
     private String requestType;
     private Long requestedBy;
     private Long leaveId;

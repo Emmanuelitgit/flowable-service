@@ -1,6 +1,6 @@
 package com.flowable.flowable.config.kafka;
 
-import com.flowable.flowable.config.kafka.dto.TMSUpdatePayload;
+import com.flowable.flowable.config.kafka.dto.UpdatePayload;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,17 +29,17 @@ public class Consumer {
 
 // Booking update consumer config
     @Bean
-    public ConsumerFactory<String, TMSUpdatePayload> consumerFactory() {
+    public ConsumerFactory<String, UpdatePayload> consumerFactory() {
         Map<String, Object> props = commonConfigs("tms-group");
         return new DefaultKafkaConsumerFactory<>(
                 props,
                 new StringDeserializer(),
-                new JsonDeserializer<>(TMSUpdatePayload.class, false));
+                new JsonDeserializer<>(UpdatePayload.class, false));
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, TMSUpdatePayload> KafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, TMSUpdatePayload> factory = new ConcurrentKafkaListenerContainerFactory<>();
+    public ConcurrentKafkaListenerContainerFactory<String, UpdatePayload> KafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, UpdatePayload> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
         return factory;
     }

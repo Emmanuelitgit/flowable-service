@@ -39,6 +39,7 @@ public class ApplicationTypeServiceImpl {
         if (applicationTypes.isEmpty()){
             throw new NotFoundException("no application type record found");
         }
+
         ResponseDTO responseDTO = AppUtils.getResponseDto("application type created", HttpStatus.OK,applicationTypes);
 
         return new ResponseEntity<>(responseDTO, HttpStatusCode.valueOf(200));
@@ -77,6 +78,7 @@ public class ApplicationTypeServiceImpl {
      * @Date 22/06/2025
      */
     public ResponseEntity<ResponseDTO> updateApplicationType(ApplicationType applicationType){
+
         ApplicationType existingData = applicationTypeRepo.findById(applicationType.getId())
                 .orElseThrow(()-> new NotFoundException("application type record cannot be found"));
 

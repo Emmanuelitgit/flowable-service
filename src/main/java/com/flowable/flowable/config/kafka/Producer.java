@@ -1,6 +1,6 @@
 package com.flowable.flowable.config.kafka;
 
-import com.flowable.flowable.config.kafka.dto.TMSUpdatePayload;
+import com.flowable.flowable.config.kafka.dto.UpdatePayload;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -29,13 +29,13 @@ public class Producer {
 
     // TMS update producer
     @Bean
-    public ProducerFactory<String, TMSUpdatePayload> producerFactory() {
+    public ProducerFactory<String, UpdatePayload> producerFactory() {
         Map<String, Object> configProps = commonConfigs();
         return new DefaultKafkaProducerFactory<>(configProps);
     }
 
     @Bean
-    public KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate() {
+    public KafkaTemplate<String, UpdatePayload> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
 

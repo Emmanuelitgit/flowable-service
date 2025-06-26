@@ -76,12 +76,14 @@ public class WorkFlowServiceImpl {
                     .name(flow.getName())
                     .applicationId(workFlows.getApplicationId())
                     .priority(flow.getPriority())
+                    .requestType(workFlows.getRequestType())
                     .build();
 
             // check if workflow name already exist
-            Optional<WorkFlow> isFlowExist = workFlowRepo.findByName(workFlow.getName());
+            WorkFlow isFlowExist = workFlowRepo
+                    .findByApplicationIdAndRequestTypeAndName(workFlows.getApplicationId(), workFlows.getRequestType(),flow.getName());
 
-            if (isFlowExist.isPresent()){
+            if (isFlowExist!=null){
                 throw new AlreadyExistException("work flow name already exist:"+workFlow.getName());
             }
 

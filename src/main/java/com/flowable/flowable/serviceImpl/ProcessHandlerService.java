@@ -1,6 +1,6 @@
 package com.flowable.flowable.serviceImpl;
 
-import com.flowable.flowable.config.kafka.dto.TMSUpdatePayload;
+import com.flowable.flowable.config.kafka.dto.UpdatePayload;
 import com.flowable.flowable.dto.ResponseDTO;
 import com.flowable.flowable.dto.TaskDTO;
 import com.flowable.flowable.exception.BadRequestException;
@@ -39,12 +39,12 @@ public class ProcessHandlerService {
 
     private final ApplicationTypeRepo applicationTypeRepo;
 
-    private final KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate;
+    private final KafkaTemplate<String, UpdatePayload> kafkaTemplate;
 
     private final CompleteStatusRepo completeStatusRepo;
 
     @Autowired
-    public ProcessHandlerService(RuntimeService runtimeService, TaskService taskService, WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo, KafkaTemplate<String, TMSUpdatePayload> kafkaTemplate, CompleteStatusRepo completeStatusRepo) {
+    public ProcessHandlerService(RuntimeService runtimeService, TaskService taskService, WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo, KafkaTemplate<String, UpdatePayload> kafkaTemplate, CompleteStatusRepo completeStatusRepo) {
         this.runtimeService = runtimeService;
         this.taskService = taskService;
         this.workFlowRepo = workFlowRepo;
@@ -61,42 +61,46 @@ public class ProcessHandlerService {
      * @Date 22/06/2025
      */
     @KafkaListener(topics = "start-process-update", containerFactory = "KafkaListenerContainerFactory", groupId = "tms-group")
-    public void startLeaveProcess(TMSUpdatePayload tmsUpdatePayload) {
+    public void startLeaveProcess(UpdatePayload updatePayload) {
 
-        Map<String, Object> variables = processVariables(tmsUpdatePayload);
+        Map<String, Object> variables = processVariables(updatePayload);
 
         /** check if task is active given the leave id */
 
         Task task = taskService.createTaskQuery()
-                .processVariableValueEquals(tmsUpdatePayload.getLeaveId())
+                .processVariableValueEquals(updatePayload.getLeaveId())
                 .singleResult();
 
         if (task != null){
-            throw new BadRequestException("An active task already in use with the given id:"+tmsUpdatePayload.getLeaveId());
+            throw new BadRequestException("An active task already in use with the given id:"+ updatePayload.getLeaveId());
         }
 
         /** check application type */
 
-        log.info("About to start approval workflow for {}:->>>>", tmsUpdatePayload.getApplicationType());
+        log.info("About to start approval workflow for {}:->>>>", updatePayload.getApplicationType());
+
+       // get application type details
+        ApplicationType applicationType = applicationTypeRepo
+                .findByName(updatePayload.getApplicationType());
 
         // load the approval flow from the db sorted in ascending order by the priority
-        ApplicationType applicationType = applicationTypeRepo.findByName(tmsUpdatePayload.getApplicationType());
-        List<WorkFlow> workFlows = workFlowRepo.findByApplicationIdOrderByPriorityAsc(applicationType.getId());
+        List<WorkFlow> workFlows = workFlowRepo
+                .findByApplicationIdAndRequestTypeOrderByPriorityAsc(applicationType.getId(), updatePayload.getRequestType().toUpperCase());
 
         List<String> sortedWorkflows = workFlows.stream()
                 .sorted(Comparator.comparing(WorkFlow::getPriority))
                 .map(WorkFlow::getName)
                 .collect(Collectors.toList());
 
-//        if (!sortedWorkflows.isEmpty()) {
-//            sortedWorkflows.remove(sortedWorkflows.size() - 1);
-//        }
+       /* if (!sortedWorkflows.isEmpty()) {
+            sortedWorkflows.remove(sortedWorkflows.size() - 1);
+        }*/
 
         variables.put("approverList", sortedWorkflows);
 
         runtimeService.startProcessInstanceByKey("leaveProcess", variables);
 
-        kafkaTemplate.send( "complete-task-update", tmsUpdatePayload);
+        kafkaTemplate.send( "complete-task-update", updatePayload);
     }
 
     /**
@@ -147,27 +151,27 @@ public class ProcessHandlerService {
     /**
      * @description this method is used to complete a task by a user given the task id and some metadata thus the variables.
      * @Auther Emmanuel Yidana
-     * @param tmsUpdatePayload
+     * @param updatePayload
      * @return returns ResponseEntity containing the tasks response.
      * @Date 22/06/2025
      */
     @KafkaListener(topics = "complete-task-update", containerFactory="KafkaListenerContainerFactory", groupId = "tms-group")
-    public void completeTask(TMSUpdatePayload tmsUpdatePayload) {
+    public void completeTask(UpdatePayload updatePayload) {
 
         Map<String, Object> variables = new HashMap<>();
-        variables.put("leaveId", tmsUpdatePayload.getLeaveId());
-        variables.put("approveleaverequest", tmsUpdatePayload.getApproveleaverequest());
+        variables.put("leaveId", updatePayload.getLeaveId());
+        variables.put("approveleaverequest", updatePayload.getApproveleaverequest());
 
         log.info("About to complete task for {}", variables.get("leaveId"));
 
         /** retrieve a task given the leaveId **/
 
         Task task = taskService.createTaskQuery()
-                .processVariableValueEquals(tmsUpdatePayload.getLeaveId())
+                .processVariableValueEquals(updatePayload.getLeaveId())
                 .singleResult();
 
         if (task == null){
-            throw new NotFoundException("no active task found for:->>"+tmsUpdatePayload.getLeaveId());
+            throw new NotFoundException("no active task found for:->>"+ updatePayload.getLeaveId());
         }
         // Fetch process instance ID from the task
         String processInstanceId = task.getProcessInstanceId();
@@ -189,7 +193,7 @@ public class ProcessHandlerService {
             }
 
 
-            if (tmsUpdatePayload.getApproveleaverequest().equalsIgnoreCase("Yes")){
+            if (updatePayload.getApproveleaverequest().equalsIgnoreCase("Yes")){
 
                 ApplicationType appType = applicationTypeRepo.findByName(applicationType.toUpperCase());
                 List<WorkFlow> workFlows = workFlowRepo.findByApplicationIdOrderByPriorityAsc(appType.getId());
@@ -214,26 +218,26 @@ public class ProcessHandlerService {
 
                 log.info("Updated status:->>>>{}", updatedStatus);
 
-                TMSUpdatePayload tmsUpdatePayloadBuilder = TMSUpdatePayload
+                UpdatePayload updatePayloadBuilder = UpdatePayload
                         .builder()
                         .status(updatedStatus.toUpperCase())
-                        .leaveId(tmsUpdatePayload.getLeaveId())
+                        .leaveId(updatePayload.getLeaveId())
                         .build();
 
 
-                kafkaTemplate.send(applicationType+"-flowable-update", tmsUpdatePayloadBuilder);
+                kafkaTemplate.send(applicationType+"-flowable-update", updatePayloadBuilder);
 
-            } else if (tmsUpdatePayload.getApproveleaverequest().equalsIgnoreCase("No")) {
+            } else if (updatePayload.getApproveleaverequest().equalsIgnoreCase("No")) {
 
                 UUID applicationId = applicationTypeRepo.findByName(applicationType.toUpperCase()).getId();
 
-                TMSUpdatePayload tmsUpdatePayloadBuilder = TMSUpdatePayload
+                UpdatePayload updatePayloadBuilder = UpdatePayload
                         .builder()
                         .status(getCompeteStatus(applicationId).getOnRejection())
-                        .leaveId(tmsUpdatePayload.getLeaveId())
+                        .leaveId(updatePayload.getLeaveId())
                         .build();
 
-                kafkaTemplate.send(applicationType+"-flowable-update", tmsUpdatePayloadBuilder);
+                kafkaTemplate.send(applicationType+"-flowable-update", updatePayloadBuilder);
 
             }
 
@@ -246,23 +250,29 @@ public class ProcessHandlerService {
 
     }
 
-
+/**
+ While this may look good in the face security, it is also a big trade of for performance.
+ depending on the load of the isUserAuthorize method, there might be possible delay in response.
+ my advocate has always been to make the entry point to your system or resouces once but very strong.
+ With the wide array of security tools and frameworks available today, a system can be both highly secure and resilient if these are properly enforced.
+ That’s just my take on the meme, though
+ */
     /**
      * @description this method is used to build the process variables objects
      * @Auther Emmanuel Yidana
-     * @param tmsUpdatePayload
+     * @param updatePayload
      * @return returns ResponseEntity containing the tasks response.
      * @Date 22/06/2025
      */
-    private Map<String, Object> processVariables(TMSUpdatePayload tmsUpdatePayload){
+    private Map<String, Object> processVariables(UpdatePayload updatePayload){
         Map<String, Object> variables = new HashMap<>();
         variables.put("rejected", false);
-        variables.put("leaveId", tmsUpdatePayload.getLeaveId());
-        variables.put("requestedBy", tmsUpdatePayload.getRequestedBy());
-        variables.put("status", tmsUpdatePayload.getStatus());
+        variables.put("leaveId", updatePayload.getLeaveId());
+        variables.put("requestedBy", updatePayload.getRequestedBy());
+        variables.put("status", updatePayload.getStatus());
         variables.put("approveleaverequest", null);
-        variables.put("applicationType", tmsUpdatePayload.getApplicationType());
-        variables.put("requestType", tmsUpdatePayload.getRequestType());
+        variables.put("applicationType", updatePayload.getApplicationType());
+        variables.put("requestType", updatePayload.getRequestType());
 
         return variables;
     }

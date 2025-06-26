@@ -18,6 +18,7 @@ public class WorkFlow {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+    private String requestType;
     private UUID applicationId;
     private String name;
     private Integer priority;

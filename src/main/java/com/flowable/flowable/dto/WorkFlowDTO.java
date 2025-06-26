@@ -17,6 +17,7 @@ public class WorkFlowDTO {
     private List<Data> flow;
     private CompleteStatus completeStatus;
     private UUID applicationId;
+    private String requestType;
 
     @lombok.Data
     @Builder
