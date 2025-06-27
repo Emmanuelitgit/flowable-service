@@ -15,10 +15,13 @@ public interface WorkFlowRepo extends JpaRepository<WorkFlow, UUID> {
 
     Optional<WorkFlow> findByName(String name);
 
-    List<WorkFlow> findByApplicationIdAndRequestTypeOrderByPriorityAsc(UUID applicationId, String requestType);
-
-    Optional<WorkFlow> findByApplicationIdAndRequestType(UUID applicationId, String requestType);
 
     @Query(value = "SELECT * FROM work_flow_tb fl WHERE fl.application_id=:applicationId AND fl.request_type=:requestType AND fl.name=:name", nativeQuery = true)
     WorkFlow findByApplicationIdAndRequestTypeAndName(UUID applicationId, String requestType, String name);
+
+    List<WorkFlow> findByApplicationId(UUID applicationId);
+
+    List<WorkFlow> findByApplicationIdAndRequestTypeOrderByPriority(UUID applicationId, String requestType);
+
+    List<WorkFlow> findByApplicationIdAndRequestTypeOrderByPriorityAsc(UUID applicationId, String requestType);
 }

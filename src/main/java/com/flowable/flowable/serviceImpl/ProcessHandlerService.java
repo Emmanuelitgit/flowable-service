@@ -25,6 +25,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -85,17 +86,37 @@ public class ProcessHandlerService {
 
         // load the approval flow from the db sorted in ascending order by the priority
         List<WorkFlow> workFlows = workFlowRepo
-                .findByApplicationIdAndRequestTypeOrderByPriorityAsc(applicationType.getId(), updatePayload.getRequestType().toUpperCase());
+                .findByApplicationIdAndRequestTypeOrderByPriorityAsc(applicationType.getId(), updatePayload.getRequestType());
 
+        // filter to get initiator role priority
+        int initiatorPriority = workFlows.stream()
+                .filter(wf -> wf.getName().equalsIgnoreCase(updatePayload.getInitiatorRole()))
+                .map(WorkFlow::getPriority)
+                .findFirst()
+                .orElse(0);
+
+        log.info("initiator role:->>>{}", updatePayload.getInitiatorRole());
+
+        // sorting flows in ascending order base on priority.
+        // this get only flows which priorities are greater than the initiator priority
         List<String> sortedWorkflows = workFlows.stream()
+                .filter(wf -> wf.getPriority() > initiatorPriority)
                 .sorted(Comparator.comparing(WorkFlow::getPriority))
                 .map(WorkFlow::getName)
                 .collect(Collectors.toList());
 
-       /* if (!sortedWorkflows.isEmpty()) {
-            sortedWorkflows.remove(sortedWorkflows.size() - 1);
-        }*/
 
+        log.info("work flows:->>>>{}", sortedWorkflows);
+        log.info("initiatiro priortity:->>{}", initiatorPriority);
+        log.info("priorities:->>>{}", workFlows.size()==initiatorPriority);
+
+        // if the requester is part of the approver and he/she is the last person on the approvers list
+        if (workFlows.size()==initiatorPriority){
+            updatePayload.setLastApprover(true);
+            sortedWorkflows.add(updatePayload.getInitiatorRole());
+        }
+
+        log.info("updated work flow:->>>{}", sortedWorkflows);
         variables.put("approverList", sortedWorkflows);
 
         runtimeService.startProcessInstanceByKey("leaveProcess", variables);
@@ -185,6 +206,7 @@ public class ProcessHandlerService {
 
         log.info("Application Type from process variables: {}", applicationType);
 
+        log.info("task:->>{}", task);
 
         if (task.getName().equalsIgnoreCase("Approval Task")){
             log.info("In task approval:->>>>>");
@@ -246,17 +268,17 @@ public class ProcessHandlerService {
         }else {
             log.info("In submit leave request:->>>>>");
             taskService.complete(task.getId());
+
+            // if the requester is last approver, then re-publish an update to update the status of the request to a complete status.
+            if (updatePayload.isLastApprover()){
+                updatePayload.setApproveleaverequest("Yes");
+                kafkaTemplate.send("complete-task-update", updatePayload);
+            }
+
         }
 
     }
 
-/**
- While this may look good in the face security, it is also a big trade of for performance.
- depending on the load of the isUserAuthorize method, there might be possible delay in response.
- my advocate has always been to make the entry point to your system or resouces once but very strong.
- With the wide array of security tools and frameworks available today, a system can be both highly secure and resilient if these are properly enforced.
- That’s just my take on the meme, though
- */
     /**
      * @description this method is used to build the process variables objects
      * @Auther Emmanuel Yidana
@@ -273,6 +295,7 @@ public class ProcessHandlerService {
         variables.put("approveleaverequest", null);
         variables.put("applicationType", updatePayload.getApplicationType());
         variables.put("requestType", updatePayload.getRequestType());
+        variables.put("initiatorRole", updatePayload.getInitiatorRole());
 
         return variables;
     }

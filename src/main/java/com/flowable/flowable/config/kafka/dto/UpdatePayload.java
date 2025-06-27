@@ -16,4 +16,6 @@ public class UpdatePayload {
     private String ApplicationType;
     private String approveleaverequest;
     private String status;
+    private String initiatorRole;
+    private boolean isLastApprover;
 }
