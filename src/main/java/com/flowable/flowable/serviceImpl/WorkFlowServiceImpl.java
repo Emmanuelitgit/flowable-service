@@ -79,7 +79,7 @@ public class WorkFlowServiceImpl {
                     .name(flow.getName())
                     .applicationId(workFlows.getApplicationId())
                     .priority(flow.getPriority())
-                    .requestType(workFlows.getRequestType())
+                    .requestType(workFlows.getRequestType().toUpperCase())
                     .build();
 
             // check if workflow name already exist

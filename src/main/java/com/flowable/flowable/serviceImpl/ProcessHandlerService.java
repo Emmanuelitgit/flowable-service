@@ -86,7 +86,7 @@ public class ProcessHandlerService {
 
         // load the approval flow from the db sorted in ascending order by the priority
         List<WorkFlow> workFlows = workFlowRepo
-                .findByApplicationIdAndRequestTypeOrderByPriorityAsc(applicationType.getId(), updatePayload.getRequestType());
+                .findByApplicationIdAndRequestTypeOrderByPriorityAsc(applicationType.getId(), updatePayload.getRequestType().toUpperCase());
 
         // filter to get initiator role priority
         int initiatorPriority = workFlows.stream()
@@ -300,7 +300,9 @@ public class ProcessHandlerService {
                 // Complete this task programmatically to move the flow forward
                 Map<String, Object> vars = new HashMap<>();
                 vars.put("approveleaverequest", "Yes");
+                log.info("task:->>>{}", task);
                 taskService.complete(task.getId(), vars);
+                
 
                 ApplicationType appType = applicationTypeRepo.findByName(applicationType.toUpperCase());
 
