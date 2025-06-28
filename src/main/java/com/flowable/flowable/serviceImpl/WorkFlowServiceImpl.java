@@ -30,11 +30,14 @@ public class WorkFlowServiceImpl {
 
     private final CompleteStatusRepo completeStatusRepo;
 
+    private final ProcessHandlerService processHandlerService;
+
     @Autowired
-    public WorkFlowServiceImpl(WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo, CompleteStatusRepo completeStatusRepo) {
+    public WorkFlowServiceImpl(WorkFlowRepo workFlowRepo, ApplicationTypeRepo applicationTypeRepo, CompleteStatusRepo completeStatusRepo, ProcessHandlerService processHandlerService) {
         this.workFlowRepo = workFlowRepo;
         this.applicationTypeRepo = applicationTypeRepo;
         this.completeStatusRepo = completeStatusRepo;
+        this.processHandlerService = processHandlerService;
     }
 
 
@@ -197,6 +200,11 @@ public class WorkFlowServiceImpl {
 
         WorkFlow existingData = workFlowRepo.findById(id)
                 .orElseThrow(()-> new ResponseStatusException(HttpStatusCode.valueOf(404),"setup record cannot found"));
+
+        ApplicationType applicationType = applicationTypeRepo.findById(existingData.getApplicationId())
+                        .orElseThrow(()-> new NotFoundException("application type cannot be found"));
+
+        processHandlerService.handleRoleRemoval(existingData.getName(), applicationType.getName());
 
         workFlowRepo.deleteById(existingData.getId());
 

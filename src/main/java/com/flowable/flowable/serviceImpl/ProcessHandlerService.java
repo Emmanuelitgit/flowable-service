@@ -203,7 +203,6 @@ public class ProcessHandlerService {
                 .toString()
                 .toLowerCase();
 
-
         log.info("Application Type from process variables: {}", applicationType);
 
         log.info("task:->>{}", task);
@@ -218,25 +217,8 @@ public class ProcessHandlerService {
             if (updatePayload.getApproveleaverequest().equalsIgnoreCase("Yes")){
 
                 ApplicationType appType = applicationTypeRepo.findByName(applicationType.toUpperCase());
-                List<WorkFlow> workFlows = workFlowRepo.findByApplicationIdOrderByPriorityAsc(appType.getId());
 
-
-                String updatedStatus = null;
-
-                // the loop is used to get the nest status
-                for (int i = 0; i < workFlows.size(); i++) {
-                    if (workFlows.get(i).getName().equalsIgnoreCase(task.getAssignee())) {
-                        if (i + 1 < workFlows.size()) {
-                            updatedStatus = workFlows.get(i + 1).getName();
-                        } else {
-                            updatedStatus = workFlows.get(i).getApplicationId() != null
-                                    ? getCompeteStatus(workFlows.get(i).getApplicationId()).getOnSuccess()
-                                    : "COMPLETED";
-                        }
-                        break;
-                    }
-                }
-
+                String updatedStatus = getNextApprover(task.getAssignee(), appType.getId());
 
                 log.info("Updated status:->>>>{}", updatedStatus);
 
@@ -279,6 +261,100 @@ public class ProcessHandlerService {
 
     }
 
+
+    /**
+     * @description a helper method use to handle role removal from an ongoing or completed process.
+     * @Auther Emmanuel Yidana
+     * @param removedRole
+     * @return returns ResponseEntity containing the tasks response.
+     * @Date 28/06/2025
+     */
+    public void handleRoleRemoval(String removedRole, String applicationType) {
+
+        log.info("About to remove approver from approval flow:->>>{}", removedRole);
+
+        List<Task> tasks = taskService.createTaskQuery().processVariableValueEquals(applicationType).list();
+
+
+       // loop to complete tasks that are assigned to the removed role
+        for (Task task : tasks) {
+
+            String processInstanceId = task.getProcessInstanceId();
+
+            List<String> approverList = (List<String>) runtimeService.getVariable(processInstanceId, "approverList");
+
+            // Remove the removed role from the list
+            if (!approverList.isEmpty()){
+                approverList = approverList.stream()
+                        .filter(approver -> !approver.equalsIgnoreCase(removedRole))
+                        .collect(Collectors.toList());
+
+                // update the approval flow list
+                runtimeService.setVariable(processInstanceId, "approverList", approverList);
+            }
+
+            // Now check if the current task is assigned to the removed role
+            String currentApprover = task.getAssignee();
+            if (currentApprover != null && currentApprover.equalsIgnoreCase(removedRole)) {
+
+                // Complete this task programmatically to move the flow forward
+                Map<String, Object> vars = new HashMap<>();
+                vars.put("approveleaverequest", "Yes");
+                taskService.complete(task.getId(), vars);
+
+                ApplicationType appType = applicationTypeRepo.findByName(applicationType.toUpperCase());
+
+                // get next approver or updated status if completed
+                String updatedStatus = getNextApprover(task.getAssignee(), appType.getId());
+
+                // publish an update to update the request status of the respective application
+                UpdatePayload updatePayload = UpdatePayload
+                        .builder()
+                        .ApplicationType(applicationType)
+                        .leaveId((Long) runtimeService.getVariable(task.getProcessDefinitionId(), "leaveId"))
+                        .status(updatedStatus)
+                        .build();
+
+                kafkaTemplate.send(applicationType+"-flowable-update", updatePayload);
+
+                log.info("Auto-completed task for removed role {} in process {}", removedRole, task.getProcessInstanceId());
+            }
+        }
+    }
+
+
+    /**
+     * @description a helper method use to get next approver.
+     * @Auther Emmanuel Yidana
+     * @param currentAssignee
+     * @param applicationId
+     * @return returns the next approver as string.
+     * @Date 28/06/2025
+     */
+    public String getNextApprover(String currentAssignee, UUID applicationId){
+
+        List<WorkFlow> workFlows = workFlowRepo.findByApplicationIdOrderByPriorityAsc(applicationId);
+
+        String updatedStatus = null;
+
+        // the loop is used to get the next status
+        for (int i = 0; i < workFlows.size(); i++) {
+            if (workFlows.get(i).getName().equalsIgnoreCase(currentAssignee)) {
+                if (i + 1 < workFlows.size()) {
+                    updatedStatus = workFlows.get(i + 1).getName();
+                } else {
+                    updatedStatus = workFlows.get(i).getApplicationId() != null
+                            ? getCompeteStatus(workFlows.get(i).getApplicationId()).getOnSuccess()
+                            : "COMPLETED";
+                }
+                break;
+            }
+        }
+
+        return updatedStatus;
+    }
+
+
     /**
      * @description this method is used to build the process variables objects
      * @Auther Emmanuel Yidana
@@ -300,6 +376,7 @@ public class ProcessHandlerService {
         return variables;
     }
 
+    // a helper method to get the complete status for a flow
     public CompleteStatus getCompeteStatus(UUID id){
         return completeStatusRepo.findByApplicationId(id);
     }
