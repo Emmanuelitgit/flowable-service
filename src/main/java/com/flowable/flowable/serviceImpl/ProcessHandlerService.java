@@ -86,7 +86,7 @@ public class ProcessHandlerService {
 
         // load the approval flow from the db sorted in ascending order by the priority
         List<WorkFlow> workFlows = workFlowRepo
-                .findByApplicationIdAndRequestTypeOrderByPriorityAsc(applicationType.getId(), updatePayload.getRequestType().toUpperCase());
+                .findByApplicationIdAndRequestTypeOrderByPriorityAsc(applicationType.getId(), updatePayload.getRequestType());
 
         // filter to get initiator role priority
         int initiatorPriority = workFlows.stream()
